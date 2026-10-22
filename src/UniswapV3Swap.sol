@@ -77,4 +77,41 @@ contract UniswapV3Swap {
 		
 		return amountOut;
 	}
+
+
+	function SwapExactOutputSingle(
+		address tokenIn,
+		address tokenOut,
+		uint24 fee,
+		uint256 amountIn,
+		uint256 amountInMaximum
+	)  external returns (uint256 amount) {
+		if(amountIn == 0) revert ZeroAmount();
+
+		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+
+		IERC20(tokenIn).approve(address(ROUTER), amountIn);
+
+		ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
+			tokenIn: tokenIn,
+			tokenOut : tokenOut,
+			fee : fee,
+			recipient : msg.sender,
+			deadline : block.timestamp,
+			amountOut : amountOut,
+			amountInMaximum : amountInMaximum,
+			sqrtPriceLimitX96: 0
+		});
+
+		amountOut = ROUTER.exactOutputSingle(params);
+
+		if(amountIn < amountInMaximum) {
+			IERC20(tokenIn).approve(address(ROUTER), 0);
+			IERC20(tokenIn).transfer(msg.sender, amountInMaximum - amountIn);
+		}
+		
+		emit SwapExecuted(tokenIn, tokenOut, amountIn, amountOut);
+		
+		return amountOut;
+	}
 }
