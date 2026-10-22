@@ -108,10 +108,51 @@ contract UniswapV3Swap {
 		if(amountIn < amountInMaximum) {
 			IERC20(tokenIn).approve(address(ROUTER), 0);
 			IERC20(tokenIn).transfer(msg.sender, amountInMaximum - amountIn);
-		}
+		} 
 		
 		emit SwapExecuted(tokenIn, tokenOut, amountIn, amountOut);
 		
 		return amountOut;
+	}
+
+	// ==============================================================================
+	// EXACT INPUT MULTI-HOP — Chain multiple pools together
+	// ==============================================================================
+
+	/// @notice Multi-hop swap: chain multiple pools for better routing
+	/// @dev The path is ABI-encoded as: abi.encodePacked(tokenA, fee1, tokenB, fee2, tokenC)
+	///
+	/// Example: DAI → (0.05% pool) → USDC → (0.3% pool) → WETH
+	///   path = abi.encodePacked(DAI, uint24(500), USDC, uint24(3000), WETH)
+	///
+	/// WHY MULTI-HOP?
+	///   - Sometimes there's no direct pool between two tokens
+	///   - Sometimes routing through an intermediate token gives a better price
+	///   - Example: DAI → WETH might be cheaper as DAI → USDC → WETH
+	///
+
+	function swapExactInputMultihop(bytes calldata path, uint256 amountIn, uint256 amountOutMinimum) external returns(uint256 amountOut) {
+		if(amountIn == 0) revert ZeroAmount();
+
+		address tokenIn;
+		assembly {
+			tokenIn := shr(96, calldataload(path.offset))
+		}
+
+		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountInMaximum);
+		IERC20(tokenIn).approve(address(ROUTER), amountInMaximum);
+
+		ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputSingleParams({
+			path: path,
+			recipient : msg.sender,
+			deadline : block.timestamp,
+			amountIn : amountIn,
+			amountOutMinimum : amountOutMinimum
+		});
+
+		amountOut = ROUTER.exactInput(params);
+		emit SwapExecuted(tokenIn, tokenOut, amountIn, amountOut);
+		return amountOut;
+		
 	}
 }
