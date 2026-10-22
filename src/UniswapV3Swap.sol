@@ -53,7 +53,7 @@ contract UniswapV3Swap {
 		uint24 fee,
 		uint256 amountIn,
 		uint256 amountOutMinimum
-	)  external returns (uint256 amount) {
+	)  external returns (uint256 amountOut) {
 		if(amountIn == 0) revert ZeroAmount();
 
 		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
@@ -83,14 +83,14 @@ contract UniswapV3Swap {
 		address tokenIn,
 		address tokenOut,
 		uint24 fee,
-		uint256 amountIn,
+		uint256 amountOut,
 		uint256 amountInMaximum
-	)  external returns (uint256 amount) {
-		if(amountIn == 0) revert ZeroAmount();
+	)  external returns (uint256 amountIn) {
+		if(amountOut == 0) revert ZeroAmount();
 
-		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountInMaximum);
 
-		IERC20(tokenIn).approve(address(ROUTER), amountIn);
+		IERC20(tokenIn).approve(address(ROUTER), amountInMaximum);
 
 		ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
 			tokenIn: tokenIn,
@@ -103,16 +103,16 @@ contract UniswapV3Swap {
 			sqrtPriceLimitX96: 0
 		});
 
-		amountOut = ROUTER.exactOutputSingle(params);
+		amountIn = ROUTER.exactOutputSingle(params);
 
 		if(amountIn < amountInMaximum) {
 			IERC20(tokenIn).approve(address(ROUTER), 0);
 			IERC20(tokenIn).transfer(msg.sender, amountInMaximum - amountIn);
-		} 
-		
+		}
+
 		emit SwapExecuted(tokenIn, tokenOut, amountIn, amountOut);
-		
-		return amountOut;
+
+		return amountIn;
 	}
 
 	// ==============================================================================
@@ -134,15 +134,18 @@ contract UniswapV3Swap {
 	function swapExactInputMultihop(bytes calldata path, uint256 amountIn, uint256 amountOutMinimum) external returns(uint256 amountOut) {
 		if(amountIn == 0) revert ZeroAmount();
 
+		// path = tokenIn (20 bytes) | fee (3 bytes) | ... | tokenOut (20 bytes)
 		address tokenIn;
+		address tokenOut;
 		assembly {
 			tokenIn := shr(96, calldataload(path.offset))
+			tokenOut := shr(96, calldataload(add(path.offset, sub(path.length, 20))))
 		}
 
-		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountInMaximum);
-		IERC20(tokenIn).approve(address(ROUTER), amountInMaximum);
+		IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+		IERC20(tokenIn).approve(address(ROUTER), amountIn);
 
-		ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputSingleParams({
+		ISwapRouter.ExactInputParams memory params = ISwapRouter.ExactInputParams({
 			path: path,
 			recipient : msg.sender,
 			deadline : block.timestamp,
