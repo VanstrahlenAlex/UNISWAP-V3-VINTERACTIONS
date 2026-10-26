@@ -108,5 +108,45 @@ contract UniswapV3Liquidity {
 
 		emit PositionMinted(tokenId, liquidity, amount0, amount1);
 	}
+
+	//=========================================================================
+	// INCREASE LIQUIDITY — Add more tokens to an existing position
+	//=========================================================================
+
+	function increaseLiquidity(
+		uint256 tokenId,
+		address token0,
+		address token1,
+		uint256 amount0Desired,
+		uint256 amount1Desired
+	) external returns(uint128 liquidity, uint256 amount0, uint256 amount1) {
+
+		IERC20(token0).transferFrom(msg.sender, address(this), amount0Desired);
+		IERC20(token1).transferFrom(msg.sender, address(this), amount1Desired);
+
+		IERC20(token0).approve(address(POSITION_MANAGER), amount0Desired);
+		IERC20(token1).approve(address(POSITION_MANAGER), amount1Desired);
+
+		POSITION_MANAGER.increaseLiquidity(INonfungiblePositionManager.IncreaseLiquidityParams({
+			tokenId: tokenId,
+			amount0Desired: amount0Desired,
+			amount1Desired: amount1Desired,
+			amount0Min: 0,
+			amount1Min: 0,
+			deadline: block.timestamp
+			
+		}));
+
+		if(amount0 < amount0Desired) {
+			IERC20(token0).transfer(msg.sender, amount0Desired - amount);
+		}
+
+		if(amount1 < amount1Desired) {
+			IERC20(token1).transfer(msg.sender, amount1Desired - amount);
+		}
+
+		// emit PositionMinted(tokenId, liquidity, amount0, amount1);
+		emit LiquidityIncreased(tokenId, liquidity, amount0, amount1);
+	}
 	
 }
