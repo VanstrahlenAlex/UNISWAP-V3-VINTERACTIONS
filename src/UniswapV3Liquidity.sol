@@ -53,7 +53,60 @@ contract UniswapV3Liquidity {
 		POSITION_MANAGER = INonfungiblePositionManager(_positionManager);
 	}
 
-	
+	// ==============================================================================
+	// MINT — Create a new liquidity position
+	// ==============================================================================
 
+	/// @notice Mint a new concentrated liquidity position
+	/// @dev Creates an NFT representing the position. The caller must approve
+	/// this contract to spend both tokens before calling.
+	///
+	/// IMPORTANT: token0 must be < token1 (sorted by address).
+	/// If you pass them in wrong order, the transaction will fail.
+	///
+
+	function mintPosition(
+		address token0,
+		address token1,
+		uint24 fee,
+		int24 tickLower,
+		int24 tickUpper,
+		uint256 amount0Desired,
+		uint256 amount1Desired
+	) external returns(uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
+		IERC20(token0).transferFrom(msg.sender, address(this), amount0Desired);
+		IERC20(token1).transferFrom(msg.sender, address(this), amount1Desired);
+		
+		IERC20(token0).approve(address(POSITION_MANAGER), amount0Desired);
+		IERC20(token1).approve(address(POSITION_MANAGER), amount1Desired);
+		
+		INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+			token0: token0,
+			token1: token1,
+			fee: fee,
+			tickLower: tickLower,
+			tickUpper: tickUpper,
+			amount0Desired: amount0Desired,
+			amount1Desired: amount1Desired,
+			amount0Min: 0,
+			amount1Min: 0,
+			recipient: msg.sender,
+			deadline: block.timestamp
+		});
+
+		(tokenId, liquidity, amount0, amount1) = POSITION_MANAGER.mint(params);
+		
+		if(amount0 < amount0Desired) {
+			IERC20(token0).approve(address(POSITION_MANAGER), 0);
+			IERC20(token0).transfer(msg.sender, amount0Desired - amount);
+		}
+
+		if(amount1 < amount1Desired) {
+			IERC20(token1).approve(address(POSITION_MANAGER), 0);
+			IERC20(token1).transfer(msg.sender, amount1Desired - amount);
+		}
+
+		emit PositionMinted(tokenId, liquidity, amount0, amount1);
+	}
 	
 }
