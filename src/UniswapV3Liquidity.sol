@@ -148,5 +148,42 @@ contract UniswapV3Liquidity {
 		// emit PositionMinted(tokenId, liquidity, amount0, amount1);
 		emit LiquidityIncreased(tokenId, liquidity, amount0, amount1);
 	}
+
+	// ==============================================================================
+	// DECREASE LIQUIDITY — Remove liquidity from an existing position
+	// ==============================================================================
+
+	function decreaseLiquidity(uint256 tokenId, uint128 liquidity) external returns(uint256 amount0, uint256 amount1) {
+		POSITION_MANAGER.decreaseLiquidity(
+			INonfungiblePositionManager.DecreaseLiquidityParams({
+				tokenId: tokenId,
+				liquidity: liquidity,
+				amount0Min: 0,
+				amount1Min: 0,
+				deadline: block.timestamp
+			})
+		);
+		emit LiquidityDecreased(tokenId, amount0, amount1);
+	}
+
+	//=========================================================================
+	// COLLECT FEES
+	//=========================================================================
+
+	function collectFees(uint256 tokenId) external returns(uint256 amount0, uint256 amount1) {
+		POSITION_MANAGER.collect(
+			INonfungiblePositionManager.CollectParams({
+				tokenId: tokenId,
+				recipient: msg.sender,
+				amount0Max: type(uint128).max,
+				amount1Max: type(uint128).max	
+			})
+		);
+
+		emit FeeCollected(tokenId, amount0, amount1);
+	}
+
 	
+
+
 }
